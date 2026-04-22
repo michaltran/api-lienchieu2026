@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 
 const { testConnection } = require('./config/database');
+const { sequelize, User } = require('./models');
 const routes = require('./routes');
 const { errorHandler, notFound } = require('./middlewares/error');
 
@@ -59,6 +60,30 @@ app.use(errorHandler);
 
 (async () => {
   await testConnection();
+
+  // Auto-sync: tạo bảng nếu chưa có
+  console.log('🔄 Syncing database schema...');
+  await sequelize.sync({ alter: true });
+  console.log('✅ Database schema synced');
+
+  // Auto-seed admin nếu chưa có
+  const bcrypt = require('bcryptjs');
+  const adminCount = await User.count({ where: { role: 'super_admin' } });
+  if (adminCount === 0) {
+    const adminUsername = process.env.DEFAULT_ADMIN_USERNAME || 'admin';
+    const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@lienchieu.gov.vn';
+    const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'Admin@123456';
+    await User.create({
+      username: adminUsername,
+      email: adminEmail,
+      password: adminPassword,
+      name: 'Quản trị hệ thống',
+      role: 'super_admin',
+      status: 'active',
+    });
+    console.log(`✅ Auto-created super admin: ${adminUsername}`);
+  }
+
   app.listen(PORT, () => {
     console.log(`\n🚀 API server running at http://localhost:${PORT}`);
     console.log(`   Health check: http://localhost:${PORT}/api/health`);
