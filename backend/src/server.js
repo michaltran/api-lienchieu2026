@@ -47,9 +47,9 @@ app.set('trust proxy', 1);
 app.get('/', (req, res) => {
   res.json({
     name: 'Lien Chieu Medical Center Admin API',
-    version: '1.0.0',
+    version: '1.1.0',
     status: 'running',
-    health: '/api/health',
+    dbAutoSync: true,
   });
 });
 
