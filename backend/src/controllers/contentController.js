@@ -129,6 +129,30 @@ exports.mediaList = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+exports.publicMediaList = async (req, res, next) => {
+  try {
+    const { Op } = require('sequelize');
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 30));
+    const offset = (page - 1) * limit;
+    const { search, type, albumId } = req.query;
+
+    const where = {};
+    if (type) where.type = type;
+    if (albumId !== undefined) where.albumId = albumId === 'null' ? null : albumId;
+    if (search) where.title = { [Op.iLike]: `%${search}%` };
+
+    const { count, rows } = await Media.findAndCountAll({
+      where, limit, offset,
+      include: [
+        { model: Album, as: 'album', attributes: ['id', 'name', 'slug'] }
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    return res.json({ items: rows, page, limit, total: count, totalPages: Math.ceil(count / limit) });
+  } catch (err) { next(err); }
+};
+
 exports.mediaUpdate = async (req, res, next) => {
   try {
     const item = await Media.findByPk(req.params.id);

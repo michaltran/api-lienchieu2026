@@ -3,6 +3,7 @@ const { Post, Category, User } = require('../models');
 const { uniqueSlug } = require('../utils/slug');
 const { logActivity } = require('../utils/activity');
 const { deleteCloudinaryFile } = require('../config/cloudinary');
+const { sanitizeHtml } = require('../utils/sanitize');
 
 const INCLUDES = [
   { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
@@ -64,7 +65,8 @@ exports.create = async (req, res, next) => {
 
     const slug = await uniqueSlug(Post, title);
     const post = await Post.create({
-      title, slug, excerpt, content,
+      title, slug, excerpt,
+      content: sanitizeHtml(content),   // Làm sạch HTML trước lưu
       coverUrl, coverPublicId,
       type: type || 'news',
       categoryId: categoryId || null,
@@ -96,7 +98,12 @@ exports.update = async (req, res, next) => {
     }
 
     const allowed = ['title', 'excerpt', 'content', 'coverUrl', 'coverPublicId', 'type', 'categoryId', 'status', 'isFeatured', 'isPinned', 'tags', 'seoTitle', 'seoDescription'];
-    allowed.forEach((k) => { if (req.body[k] !== undefined) post[k] = req.body[k]; });
+    allowed.forEach((k) => {
+      if (req.body[k] !== undefined) {
+        // Sanitize nội dung HTML
+        post[k] = k === 'content' ? sanitizeHtml(req.body[k]) : req.body[k];
+      }
+    });
 
     if (req.body.title && req.body.title !== post.title) {
       post.slug = await uniqueSlug(Post, req.body.title, post.id);

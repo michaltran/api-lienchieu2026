@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 
 const { testConnection } = require('./config/database');
 const { sequelize, User } = require('./models');
@@ -13,7 +14,26 @@ const { errorHandler, notFound } = require('./middlewares/error');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com', 'https://*.cloudinary.com'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+// Ẩn thông tin server khỏi hẩu (giảm attack surface)
+app.disable('x-powered-by');
 
 const corsOrigins = [
   process.env.ADMIN_URL,
@@ -35,14 +55,49 @@ app.use(cors({
 }));
 
 app.use(cookieParser());
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+// Giới hạn JSON body 5MB (upload thật sự qua Cloudinary/Multer không qua đây)
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-if (process.env.NODE_ENV !== 'production') {
+// Log request: dev mode có màu, production log 'combined' để audit
+if (process.env.NODE_ENV === 'production') {
+  app.use(morgan('combined'));
+} else {
   app.use(morgan('dev'));
 }
 
 app.set('trust proxy', 1);
+
+// ==================== Rate Limiting ====================
+// Giới hạn chung: 200 request / 15 phút mỗi IP
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Quá nhiều yêu cầu, vui lòng thử lại sau 15 phút.' },
+});
+
+// Giới hạn đăng nhập: 10 lần / 15 phút mỗi IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // chỉ đếm lần thất bại
+  message: { success: false, message: 'Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau 15 phút.' },
+});
+
+// Giới hạn upload: 30 lần / 15 phút
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { success: false, message: 'Giới hạn upload đã đạt. Vui lòng thử lại sau.' },
+});
+
+app.use('/api/', globalLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/uploads', uploadLimiter);
 
 app.get('/', (req, res) => {
   res.json({

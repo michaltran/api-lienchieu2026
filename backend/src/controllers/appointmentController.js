@@ -8,14 +8,27 @@ const INCLUDES = [
   { model: User, as: 'confirmer', attributes: ['id', 'name', 'username'] },
 ];
 
-// POST /api/appointments/public  (FE website gửi đặt lịch)
+// POST /api/appointments/public  (FE website gửi đặt lịch khám)
 exports.publicCreate = async (req, res, next) => {
   try {
     const { patientName, patientPhone } = req.body;
     if (!patientName || !patientPhone)
       return res.status(400).json({ message: 'Thiếu tên hoặc SĐT' });
 
-    const data = { ...req.body, status: 'pending' };
+    // Validate đầu vào
+    if (patientName.trim().length < 2 || patientName.trim().length > 100) {
+      return res.status(400).json({ message: 'Tên bệnh nhân không hợp lệ (2-100 ký tự)' });
+    }
+    if (!/^[0-9+\s]{8,15}$/.test(patientPhone.trim())) {
+      return res.status(400).json({ message: 'Số điện thoại không hợp lệ' });
+    }
+
+    const data = {
+      ...req.body,
+      patientName: patientName.trim(),
+      patientPhone: patientPhone.trim(),
+      status: 'pending',
+    };
     const item = await Appointment.create(data);
     return res.status(201).json({
       message: 'Đăng ký đặt lịch thành công. Chúng tôi sẽ liên hệ sớm nhất.',

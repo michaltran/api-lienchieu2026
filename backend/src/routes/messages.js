@@ -2,8 +2,16 @@ const router = require('express').Router();
 const ctrl = require('../controllers/messageController');
 const { authenticate } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/authorize');
+const rateLimit = require('express-rate-limit');
 
-router.post('/public', ctrl.publicCreate);
+// Rate limit: 3 tin nhắn / 15 phút mỗi IP (chống spam)
+const publicMessageLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: { success: false, message: 'Bạn gửi quá nhiều tin nhắn. Vui lòng thử lại sau 15 phút.' },
+});
+
+router.post('/public', publicMessageLimiter, ctrl.publicCreate);
 
 router.use(authenticate);
 router.get('/', authorize('messages.view'), ctrl.list);

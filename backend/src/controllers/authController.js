@@ -29,11 +29,29 @@ exports.login = async (req, res, next) => {
         [Op.or]: [{ email: usernameOrEmail }, { username: usernameOrEmail }],
       },
     });
-    if (!user) return res.status(401).json({ message: 'Tài khoản không tồn tại' });
-    if (user.status !== 'active') return res.status(403).json({ message: 'Tài khoản đã bị khoá' });
+    if (!user) {
+      await logActivity(req, {
+        action: 'login_failed', entity: 'user', entityId: null,
+        description: `Đăng nhập thất bại: tài khoản không tồn tại (${usernameOrEmail})`,
+      });
+      return res.status(401).json({ message: 'Tài khoản không tồn tại' });
+    }
+    if (user.status !== 'active') {
+      await logActivity(req, {
+        action: 'login_failed', entity: 'user', entityId: user.id,
+        description: `Đăng nhập thất bại: tài khoản bị khoá (${user.username})`,
+      });
+      return res.status(403).json({ message: 'Tài khoản đã bị khoá' });
+    }
 
     const ok = await user.comparePassword(password);
-    if (!ok) return res.status(401).json({ message: 'Mật khẩu không đúng' });
+    if (!ok) {
+      await logActivity(req, {
+        action: 'login_failed', entity: 'user', entityId: user.id,
+        description: `Đăng nhập thất bại: sai mật khẩu (${user.username})`,
+      });
+      return res.status(401).json({ message: 'Mật khẩu không đúng' });
+    }
 
     const { accessToken, refreshToken } = generateTokens(user);
     user.lastLogin = new Date();
@@ -134,7 +152,10 @@ exports.changePassword = async (req, res, next) => {
   try {
     const { oldPassword, newPassword } = req.body;
     if (!oldPassword || !newPassword) return res.status(400).json({ message: 'Thiếu dữ liệu' });
-    if (newPassword.length < 6) return res.status(400).json({ message: 'Mật khẩu mới tối thiểu 6 ký tự' });
+    if (newPassword.length < 8) return res.status(400).json({ message: 'Mật khẩu mới tối thiểu 8 ký tự' });
+    if (!/(?=.*[A-Z])(?=.*[0-9])/.test(newPassword)) {
+      return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 1 chữ hoa và 1 số' });
+    }
 
     const ok = await req.user.comparePassword(oldPassword);
     if (!ok) return res.status(401).json({ message: 'Mật khẩu cũ không đúng' });

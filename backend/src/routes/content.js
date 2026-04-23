@@ -44,6 +44,7 @@ router.put('/albums/:id', authenticate, authorize('albums.update'), c.album.upda
 router.delete('/albums/:id', authenticate, authorize('albums.delete'), c.album.remove);
 
 // ========== MEDIA ==========
+router.get('/media/public', c.publicMediaList);
 router.get('/media', authenticate, c.mediaList);
 router.delete('/media/bulk', authenticate, authorize('media.delete'), c.mediaBulkDelete);
 router.patch('/media/:id', authenticate, authorize('media.update'), c.mediaUpdate);

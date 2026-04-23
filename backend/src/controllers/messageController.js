@@ -9,7 +9,21 @@ exports.publicCreate = async (req, res, next) => {
   try {
     const { senderName, message, type } = req.body;
     if (!senderName || !message) return res.status(400).json({ message: 'Thiếu dữ liệu' });
-    const item = await ContactMessage.create({ ...req.body, type: type || 'mailbox' });
+
+    // Validate chiều dài
+    if (senderName.trim().length < 2 || senderName.trim().length > 100) {
+      return res.status(400).json({ message: 'Tên không hợp lệ (2-100 ký tự)' });
+    }
+    if (message.trim().length < 10 || message.trim().length > 2000) {
+      return res.status(400).json({ message: 'Nội dung từ 10 đến 2000 ký tự' });
+    }
+
+    const item = await ContactMessage.create({
+      ...req.body,
+      senderName: senderName.trim(),
+      message: message.trim(),
+      type: type || 'mailbox',
+    });
     return res.status(201).json({ message: 'Gửi thành công. Cảm ơn bạn!', id: item.id });
   } catch (err) { next(err); }
 };
