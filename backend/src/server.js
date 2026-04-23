@@ -139,6 +139,40 @@ app.use(errorHandler);
     console.log(`✅ Auto-created super admin: ${adminUsername}`);
   }
 
+  // Auto-seed default settings nếu chưa có
+  const { Setting } = require('./models');
+  const DEFAULT_SETTINGS = [
+    {
+      key: 'hospital.timeline',
+      value: JSON.stringify([
+        { year: '2010', title: 'Giai đoạn định hình mô hình hoạt động', desc: 'Trung tâm Y tế quận Liên Chiểu được kiện toàn và đi vào hoạt động ổn định.' },
+        { year: '2015', title: 'Mở rộng quy mô phục vụ cộng đồng', desc: 'Nâng cấp cơ sở hạ tầng, mở rộng các khoa phòng lâm sàng.' },
+        { year: '2018', title: 'Chuẩn hóa quy trình, nâng cao chất lượng', desc: 'Triển khai tiêu chuẩn quản lý chất lượng bệnh viện.' },
+        { year: '2020', title: 'Tăng cường năng lực dự phòng & ứng phó dịch', desc: 'Phát huy vai trò nòng cốt trong phòng chống dịch bệnh.' },
+        { year: '2023', title: 'Đẩy mạnh chuyển đổi số y tế', desc: 'Ứng dụng CNTT trong quản lý, hướng tới hồ sơ sức khỏe điện tử.' },
+        { year: '2025', title: 'Hoàn thiện hệ sinh thái dịch vụ', desc: 'Phát triển các gói dịch vụ y tế chất lượng cao.' },
+      ]),
+      group: 'hospital',
+      type: 'json',
+      label: 'Lịch sử hình thành (Timeline)',
+      description: 'Danh sách các cột mốc lịch sử. Định dạng JSON: [{year, title, desc}]',
+      isPublic: true,
+    },
+    {
+      key: 'hospital.maps',
+      value: JSON.stringify([]),
+      group: 'hospital',
+      type: 'json',
+      label: 'Sơ đồ bệnh viện',
+      description: 'Danh sách sơ đồ các tầng. Định dạng JSON: [{id, title, level, imageUrl, description}]',
+      isPublic: true,
+    },
+  ];
+  for (const setting of DEFAULT_SETTINGS) {
+    await Setting.findOrCreate({ where: { key: setting.key }, defaults: setting });
+  }
+  console.log('✅ Default settings seeded');
+
   app.listen(PORT, () => {
     console.log(`\n🚀 API server running at http://localhost:${PORT}`);
     console.log(`   Health check: http://localhost:${PORT}/api/health`);
